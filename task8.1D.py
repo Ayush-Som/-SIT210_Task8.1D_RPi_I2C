@@ -1,46 +1,42 @@
-'''
-Task 7.3D Raspberry Pi PWM
-Student ID - 2110994802
-Name - Ayush Kumar Som 
-'''
-from signal import signal, SIGTERM, SIGHUP, pause
-from time import sleep
-from threading import Thread
-from gpiozero import DistanceSensor
-from rpi_lcd import LCD
+#System management bus library preinstalled after enabling I2C option
+import smbus
+import time
 
-running = True
-message = ""
+#I2C addresses 7 bit addresses in hexa decimal format for BH1750 sensor
+address = 0x23	#BH1750 sensor default address given by the industry itself
+start = 0x01	#LSB for starting the data transfer
+stop = 0x00	#LSB for stopping the data transfer
+reset = 0x07	#An address used for resetting the whole process
 
-lcd = LCD()
-sensor = DistanceSensor(echo = 20, trigger = 21)
+#Instantiatng
+bus = smbus.SMBus(1)
 
-def safe_exit():
-    exit(1)
+#A fucntion to read the data from the sensor in bytes and convert it to recognizable values
+def lightRead():
+	newAddress = bus.read_i2c_block_data(address, address)
+	value = lightConversion(newAddress)
+	return value
+	
+def lightConversion(newAddress):
+	conversion = ((newAddress[1] + (256 * newAddress[0]))/1.2)
+	return conversion
 
-def read_distance():
-    global message
-    while running:
-        lcd.text(message, 1)
-        sleep(0.25)
-
-def main():
-    try:
-        signal(SIGTERM, safe_exit)
-        signal(SIGHUP, safe_exit)
-        reader = Thread(target=read_distance, daemon=True)
-        display = Thread(target=update_display, daemon=True)
-        reader.start()
-        display.start()
-        pause()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        global running
-        running = False
-        reader.join()
-        lcd.clear()
-        sensor.close()
-
-if __name__ == '__main__':
-    main()
+#Main conditions and overall output
+try:
+	while 1:
+		intensity = lightRead()
+		print(f"Intensity Reading: {intensity}")
+		
+		if(intensity >= 4000):
+			print("Status: Brightest")
+		elif(intensity >= 500 and intensity < 4000):
+			print("Status: Bright")
+		elif(intensity >= 100 and intensity < 500):
+			print("Status: Medium")
+		elif(intensity > 50 and intensity < 100):
+			print("Status: Dark")
+		elif(intensity < 50):
+			print("Status: Darkest")
+		time.sleep(1)
+except KeyboardInterrupt:
+	print("Exitting")
